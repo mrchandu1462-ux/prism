@@ -1,0 +1,38 @@
+{
+  "etfTicker": "QQQ",
+  "name": "Invesco QQQ Trust",
+  "provenance": {
+    "source": "Invesco Ltd. / Nasdaq-100 Official Daily Composition Index Disclosure",
+    "retrievalDate": "2026-09-15T00:00:00.000Z",
+    "effectiveDate": "2026-09-15T00:00:00.000Z",
+    "timestamp": 1789430400000,
+    "legalDisclaimer": "TradFi ETF constituent weights are sourced from public regulatory and fund manager disclosures. Constituents do not reside on-chain."
+  },
+  "constituents": [
+    { "ticker": "AAPL", "companyName": "Apple Inc.", "weight": 0.0890, "sector": "Information Technology" },
+    { "ticker": "NVDA", "companyName": "NVIDIA Corporation", "weight": 0.0850, "sector": "Information Technology" },
+    { "ticker": "MSFT", "companyName": "Microsoft Corporation", "weight": 0.0780, "sector": "Information Technology" },
+    { "ticker": "AMZN", "companyName": "Amazon.com Inc.", "weight": 0.0520, "sector": "Consumer Discretionary" },
+    { "ticker": "AVGO", "companyName": "Broadcom Inc.", "weight": 0.0450, "sector": "Information Technology" },
+    { "ticker": "META", "companyName": "Meta Platforms Inc.", "weight": 0.0430, "sector": "Communication Services" },
+    { "ticker": "TSLA", "companyName": "Tesla Inc.", "weight": 0.0320, "sector": "Consumer Discretionary" },
+    { "ticker": "GOOGL", "companyName": "Alphabet Inc. Class A", "weight": 0.0270, "sector": "Communication Services" },
+    { "ticker": "GOOG", "companyName": "Alphabet Inc. Class C", "weight": 0.0260, "sector": "Communication Services" },
+    { "ticker": "COST", "companyName": "Costco Wholesale Corp.", "weight": 0.0240, "sector": "Consumer Staples" },
+    { "ticker": "NFLX", "companyName": "Netflix Inc.", "weight": 0.0200, "sector": "Communication Services" },
+    { "ticker": "AMD", "companyName": "Advanced Micro Devices", "weight": 0.0190, "sector": "Information Technology" },
+    { "ticker": "QCOM", "companyName": "Qualcomm Inc.", "weight": 0.0170, "sector": "Information Technology" },
+    { "ticker": "TXN", "companyName": "Texas Instruments Inc.", "weight": 0.0150, "sector": "Information Technology" },
+    { "ticker": "ADBE", "companyName": "Adobe Inc.", "weight": 0.0140, "sector": "Information Technology" },
+    { "ticker": "LIN", "companyName": "Linde plc", "weight": 0.0130, "sector": "Materials" },
+    { "ticker": "AMGN", "companyName": "Amgen Inc.", "weight": 0.0125, "sector": "Health Care" },
+    { "ticker": "INTU", "companyName": "Intuit Inc.", "weight": 0.0120, "sector": "Information Technology" },
+    { "ticker": "ISRG", "companyName": "Intuitive Surgical Inc.", "weight": 0.0115, "sector": "Health Care" },
+    { "ticker": "HON", "companyName": "Honeywell International", "weight": 0.0110, "sector": "Industrials" },
+    { "ticker": "CMCSA", "companyName": "Comcast Corporation", "weight": 0.0105, "sector": "Communication Services" },
+    { "ticker": "AMAT", "companyName": "Applied Materials Inc.", "weight": 0.0100, "sector": "Information Technology" },
+    { "ticker": "BKNG", "companyName": "Booking Holdings Inc.", "weight": 0.0095, "sector": "Consumer Discretionary" },
+    { "ticker": "VRTX", "companyName": "Vertex Pharmaceuticals", "weight": 0.0090, "sector": "Health Care" },
+    { "ticker": "PANW", "companyName": "Palo Alto Networks", "weight": 0.0085, "sector": "Information Technology" }
+  ]
+}

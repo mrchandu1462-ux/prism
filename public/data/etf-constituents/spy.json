@@ -1,0 +1,38 @@
+{
+  "etfTicker": "SPY",
+  "name": "SPDR S&P 500 ETF Trust",
+  "provenance": {
+    "source": "State Street Global Advisors (SSGA) / SEC Form N-PORT Quarterly Holding Disclosure",
+    "retrievalDate": "2026-09-15T00:00:00.000Z",
+    "effectiveDate": "2026-09-15T00:00:00.000Z",
+    "timestamp": 1789430400000,
+    "legalDisclaimer": "TradFi ETF constituent weights are sourced from public regulatory and fund manager filings. Constituents do not reside on-chain."
+  },
+  "constituents": [
+    { "ticker": "NVDA", "companyName": "NVIDIA Corporation", "weight": 0.0685, "sector": "Information Technology" },
+    { "ticker": "AAPL", "companyName": "Apple Inc.", "weight": 0.0670, "sector": "Information Technology" },
+    { "ticker": "MSFT", "companyName": "Microsoft Corporation", "weight": 0.0645, "sector": "Information Technology" },
+    { "ticker": "AMZN", "companyName": "Amazon.com Inc.", "weight": 0.0380, "sector": "Consumer Discretionary" },
+    { "ticker": "META", "companyName": "Meta Platforms Inc.", "weight": 0.0260, "sector": "Communication Services" },
+    { "ticker": "GOOGL", "companyName": "Alphabet Inc. Class A", "weight": 0.0210, "sector": "Communication Services" },
+    { "ticker": "GOOG", "companyName": "Alphabet Inc. Class C", "weight": 0.0180, "sector": "Communication Services" },
+    { "ticker": "BRK.B", "companyName": "Berkshire Hathaway Inc.", "weight": 0.0175, "sector": "Financials" },
+    { "ticker": "AVGO", "companyName": "Broadcom Inc.", "weight": 0.0170, "sector": "Information Technology" },
+    { "ticker": "TSLA", "companyName": "Tesla Inc.", "weight": 0.0150, "sector": "Consumer Discretionary" },
+    { "ticker": "JPM", "companyName": "JPMorgan Chase & Co.", "weight": 0.0135, "sector": "Financials" },
+    { "ticker": "LLY", "companyName": "Eli Lilly and Company", "weight": 0.0130, "sector": "Health Care" },
+    { "ticker": "UNH", "companyName": "UnitedHealth Group Inc.", "weight": 0.0115, "sector": "Health Care" },
+    { "ticker": "V", "companyName": "Visa Inc.", "weight": 0.0105, "sector": "Financials" },
+    { "ticker": "XOM", "companyName": "Exxon Mobil Corporation", "weight": 0.0100, "sector": "Energy" },
+    { "ticker": "MA", "companyName": "Mastercard Inc.", "weight": 0.0095, "sector": "Financials" },
+    { "ticker": "COST", "companyName": "Costco Wholesale Corp.", "weight": 0.0085, "sector": "Consumer Staples" },
+    { "ticker": "HD", "companyName": "Home Depot Inc.", "weight": 0.0080, "sector": "Consumer Discretionary" },
+    { "ticker": "PG", "companyName": "Procter & Gamble Co.", "weight": 0.0075, "sector": "Consumer Staples" },
+    { "ticker": "JNJ", "companyName": "Johnson & Johnson", "weight": 0.0070, "sector": "Health Care" },
+    { "ticker": "NFLX", "companyName": "Netflix Inc.", "weight": 0.0065, "sector": "Communication Services" },
+    { "ticker": "AMD", "companyName": "Advanced Micro Devices", "weight": 0.0060, "sector": "Information Technology" },
+    { "ticker": "CRM", "companyName": "Salesforce Inc.", "weight": 0.0055, "sector": "Information Technology" },
+    { "ticker": "BAC", "companyName": "Bank of America Corp.", "weight": 0.0050, "sector": "Financials" },
+    { "ticker": "ABBV", "companyName": "AbbVie Inc.", "weight": 0.0050, "sector": "Health Care" }
+  ]
+}
