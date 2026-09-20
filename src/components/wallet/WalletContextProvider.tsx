@@ -5,11 +5,9 @@ import {
   ConnectionProvider,
   WalletProvider,
 } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { DEFAULT_RPC_ENDPOINT } from '@/lib/solana/connection';
-
-// Import default styles for wallet adapter modal
-import '@solana/wallet-adapter-react-ui/styles.css';
+import { getRpcEndpoint } from '@/lib/solana/connection';
+import { PrismWalletModalProvider } from './PrismWalletContext';
+import { PrismWalletModal } from './PrismWalletModal';
 
 interface Props {
   children: ReactNode;
@@ -17,17 +15,20 @@ interface Props {
 
 export const WalletContextProvider: FC<Props> = ({ children }) => {
   const endpoint = useMemo(() => {
-    return process.env.NEXT_PUBLIC_SOLANA_RPC_URL || DEFAULT_RPC_ENDPOINT;
+    return getRpcEndpoint();
   }, []);
 
-  // In Solana Wallet Adapter 0.9+, standard wallets (Phantom, Solflare, Backpack)
-  // are detected automatically via the Solana Wallet Standard.
+  // In Solana Wallet Adapter, standard wallets (Phantom, Solflare, Backpack, Coinbase, etc.)
+  // are detected dynamically via the Solana Wallet Standard.
   const wallets = useMemo(() => [], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        <PrismWalletModalProvider>
+          {children}
+          <PrismWalletModal />
+        </PrismWalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

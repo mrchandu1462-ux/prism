@@ -1,21 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { Shield, Layers, Activity } from 'lucide-react';
-
-const WalletMultiButtonDynamic = dynamic(
-  async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
-  { ssr: false }
-);
+import React from 'react';
+import { Layers } from 'lucide-react';
+import { PrismWalletButton } from '@/components/wallet/PrismWalletButton';
 
 export function Header() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -44,7 +33,7 @@ export function Header() {
             <span className="font-mono">Mainnet-Beta</span>
           </div>
 
-          {mounted && <WalletMultiButtonDynamic className="!bg-indigo-600 hover:!bg-indigo-700 !rounded-xl !h-10 !text-sm !font-semibold transition-all !shadow-md !shadow-indigo-600/20" />}
+          <PrismWalletButton />
         </div>
       </div>
     </header>
