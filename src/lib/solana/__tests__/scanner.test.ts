@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
-import { parseRawTokenAccount, ScannedTokenAccount } from '../scanner';
+import { parseRawTokenAccount, fetchWalletTokenAccounts, ScannedTokenAccount } from '../scanner';
 import { adaptScannedAccountsToHoldings } from '../adapter';
 import { SupportedAssetConfig } from '@/types';
 import { calculateUnderlyingExposure } from '@/lib/engine/exposure';
@@ -261,6 +262,117 @@ describe('Solana Scanner & Adapter Subsystem (Phase 2)', () => {
       const nvda = summary.underlyingCompanies.find((c) => c.ticker === 'NVDA');
       expect(nvda?.totalExposureUsd).toBe(2000.0);
       expect(nvda?.portfolioPercentage).toBe(20.0);
+    });
+  });
+
+  describe('3. On-Chain Scanner RPC Error Handling & Empty Wallet Behavior', () => {
+    const mockOwner = new PublicKey('11111111111111111111111111111111');
+
+    it('returns 0 accounts with no error on a genuinely empty wallet', async () => {
+      const mockConnection = {
+        getParsedTokenAccountsByOwner: vi.fn().mockResolvedValue({
+          context: { slot: 100 },
+          value: [],
+        }),
+      } as unknown as Connection;
+
+      const result = await fetchWalletTokenAccounts(mockConnection, mockOwner);
+
+      expect(result.owner).toBe(mockOwner.toBase58());
+      expect(result.accounts).toEqual([]);
+      expect(result.accounts).toHaveLength(0);
+      expect(mockConnection.getParsedTokenAccountsByOwner).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws and propagates error when SPL token account scan encounters RPC 403 / 502 / failure', async () => {
+      const mockConnection = {
+        getParsedTokenAccountsByOwner: vi.fn().mockRejectedValueOnce(
+          new Error('403 Access forbidden: Cloudflare WAF block')
+        ),
+      } as unknown as Connection;
+
+      await expect(
+        fetchWalletTokenAccounts(mockConnection, mockOwner)
+      ).rejects.toThrow('Failed to scan SPL Token Program accounts: 403 Access forbidden');
+    });
+
+    it('throws and propagates error when Token-2022 account scan encounters RPC failure / timeout', async () => {
+      const mockConnection = {
+        getParsedTokenAccountsByOwner: vi
+          .fn()
+          .mockResolvedValueOnce({
+            context: { slot: 100 },
+            value: [],
+          })
+          .mockRejectedValueOnce(new Error('504 Gateway Timeout: RPC unresponsive')),
+      } as unknown as Connection;
+
+      await expect(
+        fetchWalletTokenAccounts(mockConnection, mockOwner)
+      ).rejects.toThrow('Failed to scan Token-2022 Program accounts: 504 Gateway Timeout');
+    });
+
+    it('successfully parses and merges token accounts when both SPL and Token-2022 scans succeed', async () => {
+      const mockSplAccount = {
+        pubkey: new PublicKey('AccountPubkey1111111111111111111111111111111'),
+        account: {
+          data: {
+            program: 'spl-token',
+            parsed: {
+              info: {
+                mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+                owner: mockOwner.toBase58(),
+                tokenAmount: {
+                  amount: '100000000',
+                  decimals: 6,
+                  uiAmount: 100.0,
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const mockToken2022Account = {
+        pubkey: new PublicKey('AccountPubkey2222222222222222222222222222222'),
+        account: {
+          data: {
+            program: 'spl-token-2022',
+            parsed: {
+              info: {
+                mint: 'NVDAxVerifiedMintAddress1111111111111111111',
+                owner: mockOwner.toBase58(),
+                tokenAmount: {
+                  amount: '500000000',
+                  decimals: 8,
+                  uiAmount: 5.0,
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const mockConnection = {
+        getParsedTokenAccountsByOwner: vi
+          .fn()
+          .mockResolvedValueOnce({
+            context: { slot: 100 },
+            value: [mockSplAccount],
+          })
+          .mockResolvedValueOnce({
+            context: { slot: 100 },
+            value: [mockToken2022Account],
+          }),
+      } as unknown as Connection;
+
+      const result = await fetchWalletTokenAccounts(mockConnection, mockOwner);
+
+      expect(result.accounts).toHaveLength(2);
+      expect(result.accounts[0].mint).toBe('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      expect(result.accounts[0].isToken2022).toBe(false);
+      expect(result.accounts[1].mint).toBe('NVDAxVerifiedMintAddress1111111111111111111');
+      expect(result.accounts[1].isToken2022).toBe(true);
     });
   });
 });

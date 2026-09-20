@@ -66,6 +66,8 @@ export function parseRawTokenAccount(
 /**
  * Scans all token accounts owned by the given public key across both
  * the legacy SPL Token Program and Token-2022 Program.
+ * 
+ * Propagates any RPC errors without silently converting them to empty arrays.
  */
 export async function fetchWalletTokenAccounts(
   connection: Connection,
@@ -74,43 +76,47 @@ export async function fetchWalletTokenAccounts(
   const accounts: ScannedTokenAccount[] = [];
 
   // 1. Scan Legacy SPL Token Program
+  let splAccounts;
   try {
-    const splAccounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
+    splAccounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
       programId: TOKEN_PROGRAM_ID,
     });
-
-    for (const { pubkey, account } of splAccounts.value) {
-      const parsed = parseRawTokenAccount(
-        pubkey.toBase58(),
-        account,
-        TOKEN_PROGRAM_ID.toBase58()
-      );
-      if (parsed && parsed.rawAmount > 0n) {
-        accounts.push(parsed);
-      }
-    }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error scanning SPL Token Program accounts:', err);
+    throw new Error(`Failed to scan SPL Token Program accounts: ${err?.message || String(err)}`);
+  }
+
+  for (const { pubkey, account } of splAccounts.value) {
+    const parsed = parseRawTokenAccount(
+      pubkey.toBase58(),
+      account,
+      TOKEN_PROGRAM_ID.toBase58()
+    );
+    if (parsed && parsed.rawAmount > 0n) {
+      accounts.push(parsed);
+    }
   }
 
   // 2. Scan Token-2022 Program
+  let token2022Accounts;
   try {
-    const token2022Accounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
+    token2022Accounts = await connection.getParsedTokenAccountsByOwner(ownerPublicKey, {
       programId: TOKEN_2022_PROGRAM_ID,
     });
-
-    for (const { pubkey, account } of token2022Accounts.value) {
-      const parsed = parseRawTokenAccount(
-        pubkey.toBase58(),
-        account,
-        TOKEN_2022_PROGRAM_ID.toBase58()
-      );
-      if (parsed && parsed.rawAmount > 0n) {
-        accounts.push(parsed);
-      }
-    }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error scanning Token-2022 Program accounts:', err);
+    throw new Error(`Failed to scan Token-2022 Program accounts: ${err?.message || String(err)}`);
+  }
+
+  for (const { pubkey, account } of token2022Accounts.value) {
+    const parsed = parseRawTokenAccount(
+      pubkey.toBase58(),
+      account,
+      TOKEN_2022_PROGRAM_ID.toBase58()
+    );
+    if (parsed && parsed.rawAmount > 0n) {
+      accounts.push(parsed);
+    }
   }
 
   return {

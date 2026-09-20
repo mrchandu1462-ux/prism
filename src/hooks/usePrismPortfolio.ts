@@ -118,7 +118,13 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
       setAlerts(generatedAlerts);
     } catch (err: any) {
       console.error('Failed to load wallet portfolio:', err);
-      setError(err?.message || 'Failed to scan on-chain token accounts.');
+      const msg = err?.message || 'Failed to scan on-chain token accounts.';
+      setError(msg);
+      setRawAccounts([]);
+      setDiagnostics([]);
+      setEngineHoldings([]);
+      setExposureSummary(null);
+      setAlerts([]);
     } finally {
       setIsLoading(false);
     }
