@@ -7,6 +7,7 @@ import { adaptScannedAccountsToHoldings, DiagnosticsTokenRecord } from '@/lib/so
 import { fetchLiveTokenPrices, TokenPriceRecord } from '@/lib/price/fetcher';
 import { buildAuthoritativeTokenRegistry } from '@/lib/tessera/adapter';
 import { BASE_SUPPORTED_ASSETS } from '@/config/tokens';
+import { DEMO_SCANNED_ACCOUNTS, DEMO_PRICES, DEMO_WALLET_ADDRESS } from '@/config/demo';
 import { calculateUnderlyingExposure } from '@/lib/engine/exposure';
 import { evaluateConcentrationRisk } from '@/lib/engine/concentration';
 import { getETFConstituentData } from '@/lib/etf/registry';
@@ -19,6 +20,7 @@ import {
 
 export interface UsePrismPortfolioState {
   isWalletConnected: boolean;
+  isDemoMode: boolean;
   walletAddress: string | null;
   isLoading: boolean;
   error: string | null;
@@ -32,6 +34,8 @@ export interface UsePrismPortfolioState {
   alerts: ConcentrationRiskAlert[];
   targetConcentrationPct: number;
   setTargetConcentrationPct: (val: number) => void;
+  loadDemoPortfolio: () => void;
+  exitDemoMode: () => void;
   refresh: () => Promise<void>;
 }
 
@@ -39,6 +43,7 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
   const { connection } = useConnection();
   const { publicKey, connected } = useWallet();
 
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [registryError, setRegistryError] = useState<string | null>(null);
@@ -51,7 +56,46 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
   const [alerts, setAlerts] = useState<ConcentrationRiskAlert[]>([]);
   const [targetConcentrationPct, setTargetConcentrationPct] = useState<number>(initialTargetPct);
 
+  // Load deterministic demo portfolio using exact existing engine pipelines
+  const loadDemoPortfolio = useCallback(() => {
+    setIsDemoMode(true);
+    setError(null);
+    setRegistryError(null);
+    setIsLoading(false);
+
+    const adapterResult = adaptScannedAccountsToHoldings(
+      DEMO_SCANNED_ACCOUNTS,
+      BASE_SUPPORTED_ASSETS,
+      DEMO_PRICES
+    );
+
+    setRawAccounts(DEMO_SCANNED_ACCOUNTS);
+    setPrices(DEMO_PRICES);
+    setDiagnostics(adapterResult.diagnostics);
+    setEngineHoldings(adapterResult.engineHoldings);
+
+    const summary = calculateUnderlyingExposure(
+      adapterResult.engineHoldings,
+      getETFConstituentData
+    );
+    setExposureSummary(summary);
+
+    const generatedAlerts = evaluateConcentrationRisk(summary, targetConcentrationPct);
+    setAlerts(generatedAlerts);
+  }, [targetConcentrationPct]);
+
+  // Exit demo mode and restore real wallet state
+  const exitDemoMode = useCallback(() => {
+    setIsDemoMode(false);
+  }, []);
+
   const fetchPortfolio = useCallback(async () => {
+    // If in demo mode, update calculations with current target percentage
+    if (isDemoMode) {
+      loadDemoPortfolio();
+      return;
+    }
+
     if (!connected || !publicKey) {
       setRawAccounts([]);
       setDiagnostics([]);
@@ -128,16 +172,26 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, connection, targetConcentrationPct]);
+  }, [connected, publicKey, connection, targetConcentrationPct, isDemoMode, loadDemoPortfolio]);
+
+  // Recalculate if target percentage changes in Demo Mode
+  useEffect(() => {
+    if (isDemoMode) {
+      loadDemoPortfolio();
+    }
+  }, [targetConcentrationPct, isDemoMode, loadDemoPortfolio]);
 
   // Trigger on wallet connection / public key change
   useEffect(() => {
-    fetchPortfolio();
-  }, [fetchPortfolio]);
+    if (!isDemoMode) {
+      fetchPortfolio();
+    }
+  }, [fetchPortfolio, isDemoMode]);
 
   return {
-    isWalletConnected: connected,
-    walletAddress: publicKey ? publicKey.toBase58() : null,
+    isWalletConnected: connected || isDemoMode,
+    isDemoMode,
+    walletAddress: isDemoMode ? DEMO_WALLET_ADDRESS : publicKey ? publicKey.toBase58() : null,
     isLoading,
     error,
     registryError,
@@ -150,6 +204,8 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
     alerts,
     targetConcentrationPct,
     setTargetConcentrationPct,
+    loadDemoPortfolio,
+    exitDemoMode,
     refresh: fetchPortfolio,
   };
 }

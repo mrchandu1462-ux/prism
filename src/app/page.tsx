@@ -11,7 +11,7 @@ import { DiagnosticsView } from '@/components/dashboard/DiagnosticsView';
 import { RebalanceModal } from '@/components/dashboard/RebalanceModal';
 import { usePrismPortfolio } from '@/hooks/usePrismPortfolio';
 import { RebalanceRecommendation } from '@/types';
-import { Wallet, ShieldAlert, AlertCircle, RefreshCw, Layers, TrendingUp, Sparkles } from 'lucide-react';
+import { Wallet, ShieldAlert, AlertCircle, RefreshCw, Layers, TrendingUp, Sparkles, X, Play } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const WalletMultiButtonDynamic = dynamic(
@@ -22,6 +22,7 @@ const WalletMultiButtonDynamic = dynamic(
 export default function HomePage() {
   const {
     isWalletConnected,
+    isDemoMode,
     walletAddress,
     isLoading,
     error,
@@ -33,6 +34,8 @@ export default function HomePage() {
     alerts,
     targetConcentrationPct,
     setTargetConcentrationPct,
+    loadDemoPortfolio,
+    exitDemoMode,
     refresh,
   } = usePrismPortfolio();
 
@@ -49,6 +52,28 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Demo Mode Persistent Banner */}
+        {isDemoMode && (
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border border-amber-500/30 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1 bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/30">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <div>
+                <span className="font-bold text-amber-300 tracking-wide uppercase text-[11px] mr-2">Demo Mode</span>
+                <span className="text-slate-300">Simulated portfolio ($57,000 Tech Basket) — not on-chain holdings.</span>
+              </div>
+            </div>
+            <button
+              onClick={exitDemoMode}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium transition-colors cursor-pointer text-xs shrink-0 self-start sm:self-auto"
+            >
+              <X className="w-3.5 h-3.5" />
+              Exit Demo Mode
+            </button>
+          </div>
+        )}
+
         {/* Error Notification */}
         {error && (
           <div className="p-4 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-sm flex items-start gap-3 shadow-lg">
@@ -87,8 +112,15 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="pt-2">
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
               <WalletMultiButtonDynamic className="!bg-indigo-600 hover:!bg-indigo-700 !rounded-xl !h-12 !px-6 !text-sm !font-semibold !shadow-lg !shadow-indigo-600/30 transition-all" />
+              <button
+                onClick={loadDemoPortfolio}
+                className="h-12 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold text-sm flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+              >
+                <Play className="w-4 h-4 text-cyan-400" />
+                Try Demo Portfolio
+              </button>
             </div>
 
             {/* Feature Highlights */}
@@ -108,7 +140,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          /* Connected State: Real Live Portfolio Dashboard */
+          /* Connected State / Demo Mode Active */
           <div className="space-y-6">
             {/* Top Portfolio Summary Banner */}
             <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -121,7 +153,9 @@ export default function HomePage() {
                   <span className="text-xs font-sans font-normal text-slate-400">USD</span>
                 </div>
                 <p className="text-xs text-slate-400 font-mono">
-                  Wallet: {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-6)}` : ''}
+                  {isDemoMode
+                    ? 'Portfolio: Simulated Demo Tech Basket'
+                    : `Wallet: ${walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-6)}` : ''}`}
                 </p>
               </div>
 
@@ -148,16 +182,37 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                <button
-                  onClick={refresh}
-                  disabled={isLoading}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
-                  title="Rescan on-chain balances"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                </button>
+                {!isDemoMode && (
+                  <button
+                    onClick={refresh}
+                    disabled={isLoading}
+                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+                    title="Rescan on-chain balances"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Empty Wallet CTA: Offer Demo Portfolio if connected wallet has 0 assets */}
+            {engineHoldings.length === 0 && !isDemoMode && !isLoading && (
+              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                <p className="text-sm text-slate-300">
+                  No supported tokenized equities were detected in your connected wallet.
+                </p>
+                <p className="text-xs text-slate-400 max-w-lg mx-auto">
+                  You can explore PRISM&apos;s full look-through risk engine, concentration sliders, and Jupiter rebalancer using our sample demo basket.
+                </p>
+                <button
+                  onClick={loadDemoPortfolio}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs inline-flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Try Demo Portfolio
+                </button>
+              </div>
+            )}
 
             {/* Hero Look-Through Toggle */}
             <LookThroughToggle
@@ -220,9 +275,9 @@ export default function HomePage() {
                 onClick={() => setShowDiagnostics(!showDiagnostics)}
                 className="hover:text-slate-200 underline font-mono text-[11px] cursor-pointer"
               >
-                {showDiagnostics ? '▲ Hide On-Chain Scanner Diagnostics' : '▼ Show On-Chain Scanner Diagnostics'}
+                {showDiagnostics ? '▲ Hide Scanner Diagnostics' : '▼ Show Scanner Diagnostics'}
               </button>
-              <span>Verified Token-2022 & SPL Mainnet Feeds</span>
+              <span>{isDemoMode ? 'Verified Mainnet Mint Configurations (Demo Mode)' : 'Verified Token-2022 & SPL Mainnet Feeds'}</span>
             </div>
 
             {showDiagnostics && (
@@ -232,6 +287,7 @@ export default function HomePage() {
                 isLoading={isLoading}
                 onRefresh={refresh}
                 totalReportedUsd={totalPortfolioUsd}
+                isDemoMode={isDemoMode}
               />
             )}
           </div>
