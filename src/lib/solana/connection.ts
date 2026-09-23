@@ -4,23 +4,20 @@ import { Connection, Commitment } from '@solana/web3.js';
  * SOLANA RPC CONNECTION PROVIDER
  * 
  * Rules Adherence:
- * - Resilient RPC error handling.
- * - Routes browser RPC traffic through Next.js /api/rpc proxy to prevent Cloudflare 403 Origin blocks and protect private RPC API keys.
- * - Allows configurable RPC endpoints via SOLANA_RPC_URL (server/Vercel) and NEXT_PUBLIC_SOLANA_RPC_URL.
+ * - Browser runtime ALWAYS routes through internal Next.js /api/rpc proxy.
+ *   This ensures:
+ *   1. Zero leakage of private RPC API keys (Helius, QuickNode, Alchemy, etc.) to the browser.
+ *   2. Prevents Cloudflare 403 blocks caused by browser Origin headers on public RPCs.
+ * - Server/Node/Test runtime connects using server-side SOLANA_RPC_URL.
  */
 
 export function getRpcEndpoint(): string {
-  // If explicitly overridden via NEXT_PUBLIC_SOLANA_RPC_URL, respect it
-  if (process.env.NEXT_PUBLIC_SOLANA_RPC_URL) {
-    return process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
-  }
-
-  // In browser runtime, route through internal Next.js RPC proxy to prevent CORS/403 origin blocks & protect private keys
+  // In browser runtime, ALWAYS route through internal Next.js RPC proxy
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/api/rpc`;
   }
 
-  // In Node.js / SSR / server / test runtime, use server-side env var or fallback
+  // In Node.js / SSR / server / test runtime, use server-side env var
   return process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 }
 

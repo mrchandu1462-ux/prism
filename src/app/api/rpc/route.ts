@@ -113,10 +113,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4. Resolve server-side upstream URL strictly (no client-supplied destination allowed)
+  // 4. Resolve server-side upstream URL strictly from SOLANA_RPC_URL (no client-supplied destination allowed)
   const upstreamUrl =
     process.env.SOLANA_RPC_URL ||
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
     'https://api.mainnet-beta.solana.com';
 
   // 5. Forward request to upstream Solana RPC with timeout
