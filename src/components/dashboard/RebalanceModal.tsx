@@ -19,6 +19,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Sliders,
+  Sparkles,
   TrendingDown,
   X,
   Zap,
@@ -29,6 +30,7 @@ interface RebalanceModalProps {
   onClose: () => void;
   recommendation: RebalanceRecommendation;
   onSwapSuccess: () => Promise<void>;
+  isDemoMode?: boolean;
 }
 
 export function RebalanceModal({
@@ -36,6 +38,7 @@ export function RebalanceModal({
   onClose,
   recommendation,
   onSwapSuccess,
+  isDemoMode = false,
 }: RebalanceModalProps) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
@@ -50,12 +53,37 @@ export function RebalanceModal({
     Math.max(1, Math.round(recommendation.sellAmountTokens * Math.pow(10, recommendation.directStockToSell.decimals)))
   ).toString();
 
-  // Fetch Live Quote whenever modal opens
+  // Fetch Live Quote or Prepare Deterministic Demo Quote
   const loadQuote = async () => {
     setStatus('FETCHING_QUOTE');
     setErrorMessage(null);
     setTxSignature(null);
 
+    // In Demo Mode: produce deterministic simulated quote matching exact rebalance math
+    if (isDemoMode) {
+      const expectedOutput = recommendation.sellAmountUsd;
+      const slippageBps = 50; // 0.5%
+      const minimumOutput = expectedOutput * (1 - slippageBps / 10000);
+
+      const demoQuote: FormattedQuoteSummary = {
+        inputSymbol: recommendation.directStockToSell.symbol,
+        inputAmountTokens: recommendation.sellAmountTokens,
+        inputAmountLamports: inputLamports,
+        outputSymbol: recommendation.outputToken.symbol,
+        expectedOutputTokens: expectedOutput,
+        minimumOutputTokens: minimumOutput,
+        priceImpactPct: 0.01,
+        slippageBps,
+        routeLabels: [recommendation.directStockToSell.symbol, 'USDC (Jupiter Best Route)'],
+        rawQuote: null as any,
+      };
+
+      setQuoteSummary(demoQuote);
+      setStatus('QUOTE_READY');
+      return;
+    }
+
+    // Live Wallet Mode: fetch real Jupiter quote across on-chain pools
     try {
       const rawQuote = await fetchJupiterQuote(
         recommendation.directStockToSell.mint,
@@ -88,10 +116,16 @@ export function RebalanceModal({
       setErrorMessage(null);
       setTxSignature(null);
     }
-  }, [isOpen]);
+  }, [isOpen, isDemoMode]);
 
-  // Execute Swap Transaction
+  // Execute Swap Transaction (or Simulate in Demo Mode)
   const handleExecuteSwap = async () => {
+    if (isDemoMode) {
+      setStatus('CONFIRMED');
+      await onSwapSuccess();
+      return;
+    }
+
     if (!publicKey || !quoteSummary) return;
 
     setStatus('BUILDING_TRANSACTION');
@@ -162,17 +196,24 @@ export function RebalanceModal({
               <Zap className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 De-Risk Concentration — Jupiter Swap
+                {isDemoMode && (
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    Demo Mode
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-slate-400">
-                User-approved on-chain rebalancing order
+                {isDemoMode
+                  ? 'Simulated Jupiter Rebalance Preview'
+                  : 'User-approved on-chain rebalancing order'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -263,8 +304,8 @@ export function RebalanceModal({
 
               <div className="flex justify-between items-center text-slate-400 text-[10px] pt-1 border-t border-slate-700/40">
                 <span>Signer Wallet:</span>
-                <span className="font-mono text-slate-300 truncate max-w-[200px]" title={publicKey?.toBase58()}>
-                  {publicKey ? `${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-6)}` : ''}
+                <span className="font-mono text-slate-300 truncate max-w-[200px]">
+                  {isDemoMode ? 'Demo Portfolio (Simulated)' : publicKey ? `${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-6)}` : ''}
                 </span>
               </div>
             </div>
@@ -283,24 +324,28 @@ export function RebalanceModal({
         )}
 
         {/* Success Confirmation Banner */}
-        {status === 'CONFIRMED' && txSignature && (
+        {status === 'CONFIRMED' && (
           <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-200 text-xs space-y-2">
             <div className="flex items-center gap-2 font-bold text-sm text-emerald-300">
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>Exposure Successfully Reduced!</span>
+              <span>{isDemoMode ? 'Simulated Rebalance Complete!' : 'Exposure Successfully Reduced!'}</span>
             </div>
             <p className="text-emerald-300/90 leading-relaxed">
-              Transaction confirmed on Solana. Direct holdings swapped into USDC and portfolio rebalanced.
+              {isDemoMode
+                ? 'Simulated portfolio updated to target concentration. No on-chain transaction was submitted.'
+                : 'Transaction confirmed on Solana. Direct holdings swapped into USDC and portfolio rebalanced.'}
             </p>
-            <a
-              href={`https://solscan.io/tx/${txSignature}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] text-cyan-400 hover:text-cyan-300 underline pt-1"
-            >
-              <span>View on Solscan ({txSignature.slice(0, 8)}...{txSignature.slice(-8)})</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {!isDemoMode && txSignature && (
+              <a
+                href={`https://solscan.io/tx/${txSignature}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 font-mono text-[11px] text-cyan-400 hover:text-cyan-300 underline pt-1"
+              >
+                <span>View on Solscan ({txSignature.slice(0, 8)}...{txSignature.slice(-8)})</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
         )}
 
@@ -363,7 +408,7 @@ export function RebalanceModal({
                 )}
                 {status === 'QUOTE_READY' && (
                   <>
-                    <span>Approve & Sign Swap</span>
+                    <span>{isDemoMode ? 'Demo — No Transaction' : 'Approve & Sign Swap'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

@@ -263,6 +263,7 @@ export default function HomePage() {
                 isOpen={!!activeRebalancePlan}
                 onClose={() => setActiveRebalancePlan(null)}
                 recommendation={activeRebalancePlan}
+                isDemoMode={isDemoMode}
                 onSwapSuccess={async () => {
                   await refresh();
                 }}

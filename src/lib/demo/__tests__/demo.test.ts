@@ -116,4 +116,38 @@ describe('PRISM Demo Mode Integration & Isolation', () => {
       expect(alert?.excessUsd).toBeCloseTo(2232.5, 2);
     });
   });
+
+  describe('4. Demo Mode Rebalance Quote & Language Consistency', () => {
+    it('generates consistent expected USDC output matching the rebalance recommendation ($3,372.50)', () => {
+      const adapterResult = adaptScannedAccountsToHoldings(
+        DEMO_SCANNED_ACCOUNTS,
+        SUPPORTED_ASSETS,
+        DEMO_PRICES
+      );
+      const summary = calculateUnderlyingExposure(adapterResult.engineHoldings, getETFConstituentData);
+
+      const plan = generateRebalanceRecommendation(
+        'NVDA',
+        summary,
+        10.0,
+        SUPPORTED_ASSETS.USDC,
+        (ticker) => Object.values(SUPPORTED_ASSETS).find((a) => a.underlyingTicker === ticker)
+      );
+
+      expect(plan).not.toBeNull();
+      if (!plan) return;
+
+      // Sells ~28.1042 NVDAx ($3,372.50 value)
+      expect(plan.sellAmountTokens).toBeCloseTo(28.1041666, 4);
+      expect(plan.sellAmountUsd).toBeCloseTo(3372.5, 2);
+
+      // Simulated quote output in Demo Mode must match recommendation exact dollar value ($3,372.50)
+      const expectedUsdcOutput = plan.sellAmountUsd;
+      const slippageBps = 50; // 0.5%
+      const minimumUsdcOutput = expectedUsdcOutput * (1 - slippageBps / 10000);
+
+      expect(expectedUsdcOutput).toBeCloseTo(3372.5, 2);
+      expect(minimumUsdcOutput).toBeCloseTo(3355.6375, 2);
+    });
+  });
 });
