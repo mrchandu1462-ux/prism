@@ -32,7 +32,6 @@ export function calculateUnderlyingExposure(
 
   // Map of underlying company ticker -> UnderlyingCompanyExposure accumulator
   const companyMap = new Map<string, UnderlyingCompanyExposure>();
-  const sectorMap = new Map<string, number>();
 
   // Process all holdings
   for (const holding of holdings) {
@@ -58,12 +57,6 @@ export function calculateUnderlyingExposure(
       existing.directHoldingUsd += holding.usdValue;
       existing.totalExposureUsd += holding.usdValue;
       companyMap.set(ticker, existing);
-
-      // Accumulate direct single stock sector breakdown
-      if (holding.sector) {
-        const currentSectorUsd = sectorMap.get(holding.sector) || 0;
-        sectorMap.set(holding.sector, currentSectorUsd + holding.usdValue);
-      }
     } else if (holding.assetType === 'ETF' && holding.etfConstituentId) {
       const etfData = getETFData(holding.etfConstituentId);
       if (!etfData) continue;
@@ -75,7 +68,7 @@ export function calculateUnderlyingExposure(
         const existing = companyMap.get(ticker) || {
           ticker,
           companyName: constituent.companyName,
-          sector: constituent.sector,
+          sector: constituent.sector || 'Unclassified',
           directHoldingUsd: 0,
           etfDerivedUsd: 0,
           totalExposureUsd: 0,
@@ -98,14 +91,16 @@ export function calculateUnderlyingExposure(
         });
 
         companyMap.set(ticker, existing);
-
-        // Accumulate sector breakdown
-        if (constituent.sector) {
-          const currentSectorUsd = sectorMap.get(constituent.sector) || 0;
-          sectorMap.set(constituent.sector, currentSectorUsd + contributedUsd);
-        }
       }
     }
+  }
+
+  // Aggregate sector breakdown directly from resolved underlying companies
+  const sectorMap = new Map<string, number>();
+  for (const company of companyMap.values()) {
+    const sector = company.sector || 'Unclassified';
+    const currentSectorUsd = sectorMap.get(sector) || 0;
+    sectorMap.set(sector, currentSectorUsd + company.totalExposureUsd);
   }
 
   // Format underlying companies and calculate exact portfolio percentages

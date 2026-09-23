@@ -35,6 +35,7 @@ export default function HomePage() {
     targetConcentrationPct,
     setTargetConcentrationPct,
     loadDemoPortfolio,
+    applyDemoRebalance,
     exitDemoMode,
     refresh,
   } = usePrismPortfolio();
@@ -264,8 +265,13 @@ export default function HomePage() {
                 onClose={() => setActiveRebalancePlan(null)}
                 recommendation={activeRebalancePlan}
                 isDemoMode={isDemoMode}
-                onSwapSuccess={async () => {
-                  await refresh();
+                onSwapSuccess={async (rec) => {
+                  const plan = rec || activeRebalancePlan;
+                  if (isDemoMode && plan) {
+                    applyDemoRebalance(plan);
+                  } else {
+                    await refresh();
+                  }
                 }}
               />
             )}

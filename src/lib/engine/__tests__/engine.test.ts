@@ -6,9 +6,10 @@ import {
 } from '@/types';
 import { calculateUnderlyingExposure } from '../exposure';
 import { evaluateConcentrationRisk } from '../concentration';
-import { generateRebalanceRecommendation } from '../rebalance';
+import { generateRebalanceRecommendation, applySimulatedRebalance } from '../rebalance';
 import { getETFConstituentData } from '@/lib/etf/registry';
 import { SUPPORTED_ASSETS } from '@/config/tokens';
+import { ScannedTokenAccount } from '@/lib/solana/scanner';
 
 describe('PRISM Core Risk & Rebalancing Engine', () => {
   // Mock ETF data for exact mathematical determinism
@@ -177,6 +178,54 @@ describe('PRISM Core Risk & Rebalancing Engine', () => {
       expect(nvda?.etfDerivedUsd).toBe(0);
       expect(nvda?.totalExposureUsd).toBe(10000);
       expect(nvda?.portfolioPercentage).toBe(50);
+    });
+
+    it('derives sector breakdown directly from resolved underlying companies with exact equality', () => {
+      const holdings: AssetHolding[] = [
+        {
+          mint: 'SPYx_MINT',
+          symbol: 'SPYx',
+          name: 'SPDR S&P 500 Tokenized ETF',
+          assetType: 'ETF',
+          rawBalance: BigInt(1000000000),
+          uiAmount: 10,
+          usdPrice: 500,
+          usdValue: 5000,
+          etfConstituentId: 'SPY',
+        },
+        {
+          mint: 'NVDAx_MINT',
+          symbol: 'NVDAx',
+          name: 'NVIDIA Tokenized Stock',
+          assetType: 'SINGLE_STOCK',
+          rawBalance: BigInt(1600000000),
+          uiAmount: 16,
+          usdPrice: 125,
+          usdValue: 2000,
+          underlyingTicker: 'NVDA',
+          sector: 'Information Technology',
+        },
+      ];
+
+      const result = calculateUnderlyingExposure(holdings, mockGetETFData);
+
+      // In mock SPY: NVDA (6% = $300), AAPL (7% = $350), MSFT (6.5% = $325) -> all Information Technology
+      // Direct NVDA = $2,000 (Information Technology)
+      // Total IT = $300 + $350 + $325 + $2,000 = $2,975
+      const itSector = result.sectorBreakdown.find((s) => s.sector === 'Information Technology');
+      expect(itSector).toBeDefined();
+      expect(itSector?.exposureUsd).toBe(2975);
+      expect(itSector?.portfolioPercentage).toBeCloseTo((2975 / 7000) * 100, 4);
+
+      // Mathematical equivalence: sum of all company exposures grouped by sector must equal sectorBreakdown
+      const groupedSums = new Map<string, number>();
+      for (const comp of result.underlyingCompanies) {
+        groupedSums.set(comp.sector, (groupedSums.get(comp.sector) || 0) + comp.totalExposureUsd);
+      }
+
+      for (const sector of result.sectorBreakdown) {
+        expect(sector.exposureUsd).toBeCloseTo(groupedSums.get(sector.sector) || 0, 4);
+      }
     });
 
     it('handles empty / zero balance portfolio safely', () => {
@@ -510,6 +559,69 @@ describe('PRISM Core Risk & Rebalancing Engine', () => {
       expect(plan?.outputToken.symbol).toBe('USDC');
       expect(plan?.projectedNewExposureUsd).toBe(12000);
       expect(plan?.projectedNewPercentage).toBe(12.0);
+    });
+
+    it('applies simulated rebalance transition accurately to token accounts', () => {
+      const mockAccounts: ScannedTokenAccount[] = [
+        {
+          pubkey: 'UsdcPubkey',
+          mint: SUPPORTED_ASSETS.USDC.mint,
+          owner: 'TestOwner',
+          rawAmount: 10000000000n, // 10,000 USDC
+          decimals: 6,
+          uiAmount: 10000,
+          programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+          isToken2022: false,
+        },
+        {
+          pubkey: 'NvdaxPubkey',
+          mint: SUPPORTED_ASSETS.NVDAx.mint,
+          owner: 'TestOwner',
+          rawAmount: 5000000000n, // 50 NVDAx
+          decimals: 8,
+          uiAmount: 50,
+          programId: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+          isToken2022: true,
+        },
+      ];
+
+      const recommendation = {
+        targetCompanyTicker: 'NVDA',
+        companyName: 'NVIDIA Corporation',
+        directStockToSell: SUPPORTED_ASSETS.NVDAx,
+        currentExposureUsd: 9072.5,
+        targetPercentage: 13.0,
+        excessUsd: 1662.5,
+        sellAmountUsd: 1662.5,
+        sellAmountTokens: 13.854167,
+        outputToken: SUPPORTED_ASSETS.USDC,
+        isConstrainedByDirectHolding: false,
+        projectedNewExposureUsd: 7410,
+        projectedNewPercentage: 13.0,
+      };
+
+      const result = applySimulatedRebalance(mockAccounts, recommendation, {
+        [SUPPORTED_ASSETS.USDC.mint]: {
+          mint: SUPPORTED_ASSETS.USDC.mint,
+          usdPrice: 1.0,
+          source: 'PEG_ORACLE',
+          fetchedAt: Date.now(),
+        },
+        [SUPPORTED_ASSETS.NVDAx.mint]: {
+          mint: SUPPORTED_ASSETS.NVDAx.mint,
+          usdPrice: 120.0,
+          source: 'DEXSCREENER',
+          fetchedAt: Date.now(),
+        },
+      });
+
+      const nvda = result.find((a) => a.mint === SUPPORTED_ASSETS.NVDAx.mint);
+      expect(nvda?.uiAmount).toBeCloseTo(36.145833, 4);
+      expect(nvda?.rawAmount).toBe(3614583300n);
+
+      const usdc = result.find((a) => a.mint === SUPPORTED_ASSETS.USDC.mint);
+      expect(usdc?.uiAmount).toBe(11662.5);
+      expect(usdc?.rawAmount).toBe(11662500000n);
     });
   });
 });

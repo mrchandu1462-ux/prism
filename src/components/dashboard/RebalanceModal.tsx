@@ -29,7 +29,7 @@ interface RebalanceModalProps {
   isOpen: boolean;
   onClose: () => void;
   recommendation: RebalanceRecommendation;
-  onSwapSuccess: () => Promise<void>;
+  onSwapSuccess: (recommendation?: RebalanceRecommendation) => Promise<void> | void;
   isDemoMode?: boolean;
 }
 
@@ -122,7 +122,7 @@ export function RebalanceModal({
   const handleExecuteSwap = async () => {
     if (isDemoMode) {
       setStatus('CONFIRMED');
-      await onSwapSuccess();
+      await onSwapSuccess(recommendation);
       return;
     }
 

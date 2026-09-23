@@ -28,6 +28,7 @@ export const SUPPORTED_ASSETS: Record<string, SupportedAssetConfig> = {
     decimals: 8,
     assetType: 'SINGLE_STOCK',
     underlyingTicker: 'NVDA',
+    sector: 'Information Technology',
     isVerifiedMint: true,
   },
   SPYx: {

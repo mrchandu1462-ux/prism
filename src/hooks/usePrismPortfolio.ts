@@ -10,11 +10,13 @@ import { BASE_SUPPORTED_ASSETS } from '@/config/tokens';
 import { DEMO_SCANNED_ACCOUNTS, DEMO_PRICES, DEMO_WALLET_ADDRESS } from '@/config/demo';
 import { calculateUnderlyingExposure } from '@/lib/engine/exposure';
 import { evaluateConcentrationRisk } from '@/lib/engine/concentration';
+import { applySimulatedRebalance } from '@/lib/engine/rebalance';
 import { getETFConstituentData } from '@/lib/etf/registry';
 import {
   AssetHolding,
   ConcentrationRiskAlert,
   PortfolioExposureSummary,
+  RebalanceRecommendation,
   SupportedAssetConfig,
 } from '@/types';
 
@@ -35,6 +37,7 @@ export interface UsePrismPortfolioState {
   targetConcentrationPct: number;
   setTargetConcentrationPct: (val: number) => void;
   loadDemoPortfolio: () => void;
+  applyDemoRebalance: (recommendation: RebalanceRecommendation) => void;
   exitDemoMode: () => void;
   refresh: () => Promise<void>;
 }
@@ -84,15 +87,68 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
     setAlerts(generatedAlerts);
   }, [targetConcentrationPct]);
 
+  // Apply simulated rebalance to demo state
+  const applyDemoRebalance = useCallback(
+    (recommendation: RebalanceRecommendation) => {
+      const currentAccounts = rawAccounts.length > 0 ? rawAccounts : DEMO_SCANNED_ACCOUNTS;
+      const currentPrices = Object.keys(prices).length > 0 ? prices : DEMO_PRICES;
+
+      const updatedAccounts = applySimulatedRebalance(
+        currentAccounts,
+        recommendation,
+        currentPrices
+      );
+
+      const adapterResult = adaptScannedAccountsToHoldings(
+        updatedAccounts,
+        BASE_SUPPORTED_ASSETS,
+        currentPrices
+      );
+
+      setRawAccounts(updatedAccounts);
+      setPrices(currentPrices);
+      setDiagnostics(adapterResult.diagnostics);
+      setEngineHoldings(adapterResult.engineHoldings);
+
+      const summary = calculateUnderlyingExposure(
+        adapterResult.engineHoldings,
+        getETFConstituentData
+      );
+      setExposureSummary(summary);
+
+      const generatedAlerts = evaluateConcentrationRisk(summary, targetConcentrationPct);
+      setAlerts(generatedAlerts);
+    },
+    [rawAccounts, prices, targetConcentrationPct]
+  );
+
   // Exit demo mode and restore real wallet state
   const exitDemoMode = useCallback(() => {
     setIsDemoMode(false);
   }, []);
 
   const fetchPortfolio = useCallback(async () => {
-    // If in demo mode, update calculations with current target percentage
+    // If in demo mode, preserve existing simulated accounts
     if (isDemoMode) {
-      loadDemoPortfolio();
+      if (rawAccounts.length > 0) {
+        const currentPrices = Object.keys(prices).length > 0 ? prices : DEMO_PRICES;
+        const adapterResult = adaptScannedAccountsToHoldings(
+          rawAccounts,
+          BASE_SUPPORTED_ASSETS,
+          currentPrices
+        );
+        setDiagnostics(adapterResult.diagnostics);
+        setEngineHoldings(adapterResult.engineHoldings);
+        const summary = calculateUnderlyingExposure(
+          adapterResult.engineHoldings,
+          getETFConstituentData
+        );
+        setExposureSummary(summary);
+        const generatedAlerts = evaluateConcentrationRisk(summary, targetConcentrationPct);
+        setAlerts(generatedAlerts);
+      } else {
+        loadDemoPortfolio();
+      }
       return;
     }
 
@@ -172,14 +228,15 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, connection, targetConcentrationPct, isDemoMode, loadDemoPortfolio]);
+  }, [connected, publicKey, connection, targetConcentrationPct, isDemoMode, rawAccounts, prices, loadDemoPortfolio]);
 
-  // Recalculate if target percentage changes in Demo Mode
+  // Recalculate alerts dynamically when target percentage changes
   useEffect(() => {
-    if (isDemoMode) {
-      loadDemoPortfolio();
+    if (exposureSummary) {
+      const generatedAlerts = evaluateConcentrationRisk(exposureSummary, targetConcentrationPct);
+      setAlerts(generatedAlerts);
     }
-  }, [targetConcentrationPct, isDemoMode, loadDemoPortfolio]);
+  }, [targetConcentrationPct, exposureSummary]);
 
   // Trigger on wallet connection / public key change
   useEffect(() => {
@@ -205,6 +262,7 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
     targetConcentrationPct,
     setTargetConcentrationPct,
     loadDemoPortfolio,
+    applyDemoRebalance,
     exitDemoMode,
     refresh: fetchPortfolio,
   };

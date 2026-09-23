@@ -4,6 +4,9 @@ import {
   RebalanceRecommendation,
   SupportedAssetConfig,
 } from '@/types';
+import { ScannedTokenAccount } from '../solana/scanner';
+import { TokenPriceRecord } from '../price/fetcher';
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 
 /**
  * PURE DETERMINISTIC REBALANCE SOLVER
@@ -86,4 +89,72 @@ export function generateRebalanceRecommendation(
     projectedNewExposureUsd: Number(projectedNewExposureUsd.toFixed(4)),
     projectedNewPercentage: Number(projectedNewPercentage.toFixed(4)),
   };
+}
+
+/**
+ * Pure deterministic state transition helper for simulated / demo rebalances.
+ * Applies the rebalance recommendation to the scanned token accounts:
+ * - Reduces direct stock account uiAmount / rawAmount by sellAmountTokens
+ * - Increases output token account uiAmount / rawAmount by received tokens
+ * 
+ * Returns a new array of ScannedTokenAccount without mutating inputs.
+ */
+export function applySimulatedRebalance(
+  accounts: ScannedTokenAccount[],
+  recommendation: RebalanceRecommendation,
+  prices: Record<string, TokenPriceRecord> = {}
+): ScannedTokenAccount[] {
+  const sellMint = recommendation.directStockToSell.mint;
+  const outputMint = recommendation.outputToken.mint;
+  const sellTokens = recommendation.sellAmountTokens;
+
+  const outputPrice = prices[outputMint]?.usdPrice || recommendation.outputToken.markPrice || 1.0;
+  const receivedTokens = outputPrice > 0 ? recommendation.sellAmountUsd / outputPrice : recommendation.sellAmountUsd;
+
+  let foundOutput = false;
+
+  const updatedAccounts: ScannedTokenAccount[] = accounts.map((acc) => {
+    if (acc.mint === sellMint) {
+      const newUiAmount = Math.max(0, acc.uiAmount - sellTokens);
+      const newRawAmount = BigInt(Math.max(0, Math.round(newUiAmount * Math.pow(10, acc.decimals))));
+      return {
+        ...acc,
+        uiAmount: newUiAmount,
+        rawAmount: newRawAmount,
+      };
+    }
+
+    if (acc.mint === outputMint) {
+      foundOutput = true;
+      const newUiAmount = acc.uiAmount + receivedTokens;
+      const newRawAmount = BigInt(Math.round(newUiAmount * Math.pow(10, acc.decimals)));
+      return {
+        ...acc,
+        uiAmount: newUiAmount,
+        rawAmount: newRawAmount,
+      };
+    }
+
+    return { ...acc };
+  });
+
+  if (!foundOutput) {
+    const decimals = recommendation.outputToken.decimals;
+    const rawAmount = BigInt(Math.round(receivedTokens * Math.pow(10, decimals)));
+    const isToken2022 = recommendation.outputToken.assetType !== 'STABLECOIN';
+    updatedAccounts.push({
+      pubkey: `Simulated${recommendation.outputToken.symbol}AccountPubkey1111111`,
+      mint: outputMint,
+      owner: accounts[0]?.owner || 'DemoPortfolio1111111111111111111111111111111',
+      rawAmount,
+      decimals,
+      uiAmount: receivedTokens,
+      programId: isToken2022
+        ? TOKEN_2022_PROGRAM_ID.toBase58()
+        : TOKEN_PROGRAM_ID.toBase58(),
+      isToken2022,
+    });
+  }
+
+  return updatedAccounts;
 }
