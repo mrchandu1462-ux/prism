@@ -42,21 +42,48 @@ export interface UsePrismPortfolioState {
   refresh: () => Promise<void>;
 }
 
-export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPortfolioState {
+function getInitialDemoState(initialTargetPct: number) {
+  const adapterResult = adaptScannedAccountsToHoldings(
+    DEMO_SCANNED_ACCOUNTS,
+    BASE_SUPPORTED_ASSETS,
+    DEMO_PRICES
+  );
+  const summary = calculateUnderlyingExposure(
+    adapterResult.engineHoldings,
+    getETFConstituentData
+  );
+  const generatedAlerts = evaluateConcentrationRisk(summary, initialTargetPct);
+
+  return {
+    rawAccounts: DEMO_SCANNED_ACCOUNTS,
+    prices: DEMO_PRICES,
+    diagnostics: adapterResult.diagnostics,
+    engineHoldings: adapterResult.engineHoldings,
+    exposureSummary: summary,
+    alerts: generatedAlerts,
+  };
+}
+
+export function usePrismPortfolio(
+  initialTargetPct: number = 10.0,
+  defaultDemoMode: boolean = true
+): UsePrismPortfolioState {
   const { connection } = useConnection();
   const { publicKey, connected } = useWallet();
 
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [initialDemo] = useState(() => (defaultDemoMode ? getInitialDemoState(initialTargetPct) : null));
+
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(defaultDemoMode);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [registry, setRegistry] = useState<Record<string, SupportedAssetConfig>>(BASE_SUPPORTED_ASSETS);
-  const [rawAccounts, setRawAccounts] = useState<ScannedTokenAccount[]>([]);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsTokenRecord[]>([]);
-  const [engineHoldings, setEngineHoldings] = useState<AssetHolding[]>([]);
-  const [prices, setPrices] = useState<Record<string, TokenPriceRecord>>({});
-  const [exposureSummary, setExposureSummary] = useState<PortfolioExposureSummary | null>(null);
-  const [alerts, setAlerts] = useState<ConcentrationRiskAlert[]>([]);
+  const [rawAccounts, setRawAccounts] = useState<ScannedTokenAccount[]>(() => initialDemo?.rawAccounts ?? []);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsTokenRecord[]>(() => initialDemo?.diagnostics ?? []);
+  const [engineHoldings, setEngineHoldings] = useState<AssetHolding[]>(() => initialDemo?.engineHoldings ?? []);
+  const [prices, setPrices] = useState<Record<string, TokenPriceRecord>>(() => initialDemo?.prices ?? {});
+  const [exposureSummary, setExposureSummary] = useState<PortfolioExposureSummary | null>(() => initialDemo?.exposureSummary ?? null);
+  const [alerts, setAlerts] = useState<ConcentrationRiskAlert[]>(() => initialDemo?.alerts ?? []);
   const [targetConcentrationPct, setTargetConcentrationPct] = useState<number>(initialTargetPct);
 
   // Load deterministic demo portfolio using exact existing engine pipelines
@@ -125,7 +152,17 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
   // Exit demo mode and restore real wallet state
   const exitDemoMode = useCallback(() => {
     setIsDemoMode(false);
-  }, []);
+    if (!connected || !publicKey) {
+      setRawAccounts([]);
+      setDiagnostics([]);
+      setEngineHoldings([]);
+      setPrices({});
+      setExposureSummary(null);
+      setAlerts([]);
+      setError(null);
+      setIsLoading(false);
+    }
+  }, [connected, publicKey]);
 
   const fetchPortfolio = useCallback(async () => {
     // If in demo mode, preserve existing simulated accounts
@@ -240,10 +277,15 @@ export function usePrismPortfolio(initialTargetPct: number = 10.0): UsePrismPort
 
   // Trigger on wallet connection / public key change
   useEffect(() => {
-    if (!isDemoMode) {
+    if (connected && publicKey) {
+      if (isDemoMode) {
+        setIsDemoMode(false);
+      }
+      fetchPortfolio();
+    } else if (!isDemoMode) {
       fetchPortfolio();
     }
-  }, [fetchPortfolio, isDemoMode]);
+  }, [connected, publicKey, isDemoMode, fetchPortfolio]);
 
   return {
     isWalletConnected: connected || isDemoMode,

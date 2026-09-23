@@ -370,5 +370,61 @@ describe('PRISM Demo Mode Integration & Isolation', () => {
       expect(nvdaAlert12?.excessUsd).toBeCloseTo(570.0, 2);
     });
   });
+
+  describe('7. Production Initial Demo State Invariants', () => {
+    it('initializes exact expected demo portfolio state upon entry', () => {
+      const adapterResult = adaptScannedAccountsToHoldings(
+        DEMO_SCANNED_ACCOUNTS,
+        SUPPORTED_ASSETS,
+        DEMO_PRICES
+      );
+      const summary = calculateUnderlyingExposure(adapterResult.engineHoldings, getETFConstituentData);
+      const alerts = evaluateConcentrationRisk(summary, 10.0);
+
+      // Reported tokens: 4
+      expect(adapterResult.engineHoldings).toHaveLength(4);
+      expect(DEMO_SCANNED_ACCOUNTS).toHaveLength(4);
+
+      // Individual Token Values:
+      // USDC: $10,000
+      const usdcHolding = adapterResult.engineHoldings.find((h) => h.mint === USDC_MINT_MAINNET);
+      expect(usdcHolding?.usdValue).toBe(10000);
+
+      // SPYx: $25,000
+      const spyHolding = adapterResult.engineHoldings.find((h) => h.mint === SUPPORTED_ASSETS.SPYx.mint);
+      expect(spyHolding?.usdValue).toBe(25000);
+
+      // QQQx: $16,000
+      const qqqHolding = adapterResult.engineHoldings.find((h) => h.mint === SUPPORTED_ASSETS.QQQx.mint);
+      expect(qqqHolding?.usdValue).toBe(16000);
+
+      // NVDAx: $6,000
+      const nvdaHolding = adapterResult.engineHoldings.find((h) => h.mint === SUPPORTED_ASSETS.NVDAx.mint);
+      expect(nvdaHolding?.usdValue).toBe(6000);
+
+      // Total: $57,000
+      expect(summary.totalPortfolioUsd).toBe(57000);
+
+      // Underlying companies: 38
+      expect(summary.underlyingCompanies).toHaveLength(38);
+
+      // Initial NVDA exposure: $9,072.50 / 15.92%
+      const nvdaCompany = summary.underlyingCompanies.find((c) => c.ticker === 'NVDA');
+      expect(nvdaCompany).toBeDefined();
+      expect(nvdaCompany?.directHoldingUsd).toBe(6000);
+      expect(nvdaCompany?.etfDerivedUsd).toBe(3072.5);
+      expect(nvdaCompany?.totalExposureUsd).toBe(9072.5);
+      expect(nvdaCompany?.portfolioPercentage).toBeCloseTo(15.9167, 2);
+
+      // At 10% target: concentration warning should appear
+      expect(alerts).toHaveLength(1);
+      const nvdaAlert = alerts[0];
+      expect(nvdaAlert.ticker).toBe('NVDA');
+      expect(nvdaAlert.currentPercentage).toBeCloseTo(15.9167, 2);
+      expect(nvdaAlert.targetPercentage).toBe(10.0);
+      expect(nvdaAlert.excessUsd).toBeCloseTo(3372.5, 2);
+    });
+  });
 });
+
 
